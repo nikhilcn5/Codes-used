@@ -1,0 +1,29 @@
+import pandas as pd 
+# Load the Excel file
+file_path = '/content/AT_neg_07012025.xlsx'  # Replace with the path to your file
+data = pd.read_excel(file_path)
+
+# Define the priorities for the MS2 column
+ms2_priority = {
+    'DDA for preferred ion': 1,
+    'DDA for other ion': 1,  # Equal priority as 'DDA for preferred ion'
+    'No MS2': 2              # Lowest priority
+}
+
+# Assign priority to each row based on MS2 values
+data['MS2_priority'] = data['MS2'].map(ms2_priority)
+
+# Sort by 'name' (C), priority (ascending), and 'Norm. Area average sample' (DK, descending)
+data_sorted = data.sort_values(
+    by=['Name', 'MS2_priority', 'Norm. Area average sample'],
+    ascending=[True, True, False]
+)
+
+# Keep the first row for each unique 'name' group
+result = data_sorted.drop_duplicates(subset=['Name'], keep='first')
+
+# Drop the helper column 'MS2_priority'
+result = result.drop(columns=['MS2_priority'])
+
+# Save the processed data to a new Excel file
+result.to_excel('processed_data_AT_neg_group.xlsx', index=False)
