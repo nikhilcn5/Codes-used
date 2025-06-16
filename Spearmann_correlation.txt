@@ -1,0 +1,97 @@
+#@title Spearman Correlation Analysis: NGT vs T2DM {display-mode: "code"}
+import pandas as pd
+import numpy as np
+from scipy.stats import spearmanr
+
+# File and sheet names
+file_name = "ngt-t2d-4.xlsx"
+sheet_ngt = "NGT"
+sheet_t2d = "T2D"
+
+# Read the two sheets
+df_ngt = pd.read_excel(file_name, sheet_name=sheet_ngt)
+df_t2d = pd.read_excel(file_name, sheet_name=sheet_t2d)
+
+# Ensure the Group column is present:
+# For the NGT sheet, group should be "NGT"; for T2D sheet, group should be "T2DM"
+if "Group" not in df_ngt.columns:
+    df_ngt["Group"] = "NGT"
+if "Group" not in df_t2d.columns:
+    df_t2d["Group"] = "T2DM"
+
+# Combine the two dataframes
+df = pd.concat([df_ngt, df_t2d], ignore_index=True)
+
+# Ensure that the Sex column has values "F" or "M" as expected.
+if "Sex" not in df.columns:
+    raise ValueError("Input data must contain a 'Sex' column with values 'F' and 'M'.")
+
+# List of numeric variables in the dataset
+numeric_vars = [
+    "Age", "Weight", "Height", "BMI", "BP-Sys", "BP-Dia", "Pulse", 
+    "TWC", "NEU", "LYM", "MON", "EOS", "BAS", "FBS", "HbA1C", 
+    "C-Peptide", "Insulin", "CRP"
+]
+
+# Define the base variables for which you want to assess correlations
+base_vars = ["CRP", "TWC", "BMI"]
+
+def compute_corr_for_base(df_subset, base_var, num_vars):
+    """
+    For a given DataFrame subset and a base variable, compute Spearman's correlation
+    (and p-value) between the base variable and each other numeric variable.
+    """
+    results = []
+    for comp_var in num_vars:
+        if comp_var == base_var:
+            continue
+        # Drop missing values for the pair of variables
+        data = df_subset[[base_var, comp_var]].dropna()
+        # Check that there is enough data and variability in both columns
+        if len(data) < 2 or data[base_var].nunique() < 2 or data[comp_var].nunique() < 2:
+            rho, pval = np.nan, np.nan
+        else:
+            rho, pval = spearmanr(data[base_var], data[comp_var])
+        results.append({
+            "Base Variable": base_var,
+            "Comparison Variable": comp_var,
+            "Spearman Correlation": rho,
+            "p-value": pval,
+            "N": len(data)
+        })
+    return results
+
+def analyze_subset(df_subset, analysis_label):
+    """
+    For the given subset (e.g., overall, male, or female), perform the analysis
+    separately for each group (NGT and T2DM) and for each base variable.
+    """
+    all_results = []
+    for group in ["NGT", "T2DM"]:
+        df_group = df_subset[df_subset["Group"] == group]
+        for base_var in base_vars:
+            group_results = compute_corr_for_base(df_group, base_var, numeric_vars)
+            # Annotate the results with analysis type and group
+            for r in group_results:
+                r["Analysis"] = analysis_label
+                r["Group"] = group
+            all_results.extend(group_results)
+    return pd.DataFrame(all_results)
+
+# Create subsets: Overall, Male-only, and Female-only
+df_overall = df
+df_male = df[df["Sex"] == "M"]
+df_female = df[df["Sex"] == "F"]
+
+# Perform the correlation analyses
+results_overall = analyze_subset(df_overall, "Overall")
+results_male    = analyze_subset(df_male, "Male")
+results_female  = analyze_subset(df_female, "Female")
+
+# Save all results to a single Excel file with three sheets
+with pd.ExcelWriter("final_results-4.xlsx") as writer:
+    results_overall.to_excel(writer, sheet_name="Overall", index=False)
+    results_male.to_excel(writer, sheet_name="Male", index=False)
+    results_female.to_excel(writer, sheet_name="Female", index=False)
+
+print("Analysis complete. Results saved to 'final_results-4.xlsx'.")
