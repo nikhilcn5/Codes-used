@@ -1,0 +1,94 @@
+#@title Shapiro–Wilks Test by Group: NGT and T2DM {display-mode: "code"}
+import pandas as pd
+import numpy as np
+from scipy.stats import shapiro
+
+# File and sheet names
+file_name = "ngt-t2d-2.xlsx"  # Ensure the file is uploaded to your Colab environment
+sheet_ngt = "NGT"
+sheet_t2d = "T2D"
+
+# Read the two sheets
+df_ngt = pd.read_excel(file_name, sheet_name=sheet_ngt)
+df_t2d = pd.read_excel(file_name, sheet_name=sheet_t2d)
+
+# Add the "Group" column if not present:
+# For the NGT sheet, group should be "NGT"; for the T2D sheet, group should be "T2DM"
+if "Group" not in df_ngt.columns:
+    df_ngt["Group"] = "NGT"
+if "Group" not in df_t2d.columns:
+    df_t2d["Group"] = "T2DM"
+
+# Combine the two dataframes
+df = pd.concat([df_ngt, df_t2d], ignore_index=True)
+
+# Verify that the "Sex" column exists (with values 'F' or 'M')
+if "Sex" not in df.columns:
+    raise ValueError("Input data must contain a 'Sex' column with values 'F' and 'M'.")
+
+# List of numeric variables in the dataset
+numeric_vars = [
+    "Age", "Weight", "Height", "BMI", "BP-Sys", "BP-Dia", "Pulse", 
+    "TWC", "NEU", "LYM", "MON", "EOS", "BAS", "FBS", "HbA1C", 
+    "C-Peptide", "Insulin", "CRP"
+]
+
+def shapiro_results_for_subset(data, numeric_vars):
+    """
+    Compute the Shapiro–Wilks test for each numeric variable in the provided data.
+    Returns a DataFrame with the variable name, test statistic, p-value, and sample size.
+    """
+    res_list = []
+    for var in numeric_vars:
+        series = data[var].dropna()
+        # Shapiro–Wilks test requires at least 3 data points.
+        if len(series) < 3:
+            stat, pval = np.nan, np.nan
+        else:
+            stat, pval = shapiro(series)
+        res_list.append({
+            "Variable": var,
+            "Shapiro Statistic": stat,
+            "p-value": pval,
+            "N": len(series)
+        })
+    return pd.DataFrame(res_list)
+
+# Create subsets for each group
+
+# Overall NGT (all subjects with Group == "NGT")
+df_ngt_overall = df[df["Group"] == "NGT"]
+
+# Overall T2D (all subjects with Group == "T2DM")
+df_t2dm_overall = df[df["Group"] == "T2DM"]
+
+# Male NGT (Group == "NGT" and Sex == "M")
+df_ngt_male = df[(df["Group"] == "NGT") & (df["Sex"] == "M")]
+
+# Female NGT (Group == "NGT" and Sex == "F")
+df_ngt_female = df[(df["Group"] == "NGT") & (df["Sex"] == "F")]
+
+# Male T2D (Group == "T2DM" and Sex == "M")
+df_t2dm_male = df[(df["Group"] == "T2DM") & (df["Sex"] == "M")]
+
+# Female T2D (Group == "T2DM" and Sex == "F")
+df_t2dm_female = df[(df["Group"] == "T2DM") & (df["Sex"] == "F")]
+
+# Compute Shapiro–Wilks results for each subset
+res_ngt_overall = shapiro_results_for_subset(df_ngt_overall, numeric_vars)
+res_t2dm_overall = shapiro_results_for_subset(df_t2dm_overall, numeric_vars)
+res_ngt_male    = shapiro_results_for_subset(df_ngt_male, numeric_vars)
+res_ngt_female  = shapiro_results_for_subset(df_ngt_female, numeric_vars)
+res_t2dm_male   = shapiro_results_for_subset(df_t2dm_male, numeric_vars)
+res_t2dm_female = shapiro_results_for_subset(df_t2dm_female, numeric_vars)
+
+# Save all results to a single Excel file with each group in a separate sheet
+with pd.ExcelWriter("shapiro_group_results.xlsx") as writer:
+    res_ngt_overall.to_excel(writer, sheet_name="Overall NGT", index=False)
+    res_t2dm_overall.to_excel(writer, sheet_name="Overall T2D", index=False)
+    res_ngt_male.to_excel(writer, sheet_name="Male NGT", index=False)
+    res_ngt_female.to_excel(writer, sheet_name="Female NGT", index=False)
+    res_t2dm_male.to_excel(writer, sheet_name="Male T2D", index=False)
+    res_t2dm_female.to_excel(writer, sheet_name="Female T2D", index=False)
+
+print("Shapiro–Wilks tests completed and results saved to 'shapiro_group_results.xlsx'.")
