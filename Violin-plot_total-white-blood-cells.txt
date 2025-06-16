@@ -1,0 +1,75 @@
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# Load Excel file
+file_path = "/content/ngt-t2d-2.xlsx"  # Update file path if needed
+ngt = pd.read_excel(file_path, sheet_name="NGT")
+t2d = pd.read_excel(file_path, sheet_name="T2D")
+
+# Standardize column names
+ngt.columns = ngt.columns.str.strip().str.upper()
+t2d.columns = t2d.columns.str.strip().str.upper()
+
+# Ensure column names are unique
+ngt = ngt.loc[:, ~ngt.columns.duplicated()]
+t2d = t2d.loc[:, ~t2d.columns.duplicated()]
+
+# Add 'GROUP' column for overall comparison
+ngt["GROUP"] = "NGT Overall"
+t2d["GROUP"] = "T2DM Overall"
+
+# Add sex-specific groups
+ngt_male = ngt[ngt["SEX"] == "M"].copy()
+t2d_male = t2d[t2d["SEX"] == "M"].copy()
+ngt_female = ngt[ngt["SEX"] == "F"].copy()
+t2d_female = t2d[t2d["SEX"] == "F"].copy()
+
+ngt_male["GROUP"] = "NGT Male"
+t2d_male["GROUP"] = "T2DM Male"
+ngt_female["GROUP"] = "NGT Female"
+t2d_female["GROUP"] = "T2DM Female"
+
+# Merge datasets into one
+df = pd.concat([ngt, t2d, ngt_male, t2d_male, ngt_female, t2d_female], ignore_index=True)
+
+# Convert TWC column to numeric if needed
+df["TWC"] = pd.to_numeric(df["TWC"], errors="coerce")
+
+# Define black and white color palette
+bw_palette = {
+    "NGT Overall": "white",
+    "T2DM Overall": "gray",
+    "NGT Male": "white",
+    "T2DM Male": "gray",
+    "NGT Female": "white",
+    "T2DM Female": "gray"
+}
+
+# Function to create clean white, thin violin plots with adjusted figure size
+def plot_clean_thin_violin(group_list, filename):
+    # For 2 groups, use a narrower figure width so that the violins (width=0.3) appear closer together.
+    plt.figure(figsize=(4, 6))
+    ax = sns.violinplot(x="GROUP", y="TWC", data=df[df["GROUP"].isin(group_list)],
+                        order=group_list, color="white", linewidth=1.5, 
+                        inner="quartile", edgecolor="black", width=0.6)
+    
+    plt.xticks(rotation=45)
+    plt.ylabel("TWC (cells/μL)")
+    plt.xlabel("Group")
+    plt.title(f"Violin Plot of TWC for {', '.join(group_list)}")
+
+    # Remove horizontal gridlines
+    ax.yaxis.grid(False)
+    
+    # Remove top and right borders while keeping the y-axis border intact
+    sns.despine(top=True, right=True)
+    
+    plt.tight_layout()
+    plt.savefig(f"{filename}.png", dpi=300, bbox_inches='tight')
+    plt.show()
+
+# Generate thin, clean, black and white violin plots
+plot_clean_thin_violin(["NGT Overall", "T2DM Overall"], "NEW-new-thin_clean_violinplot_TWC_overall")
+plot_clean_thin_violin(["NGT Male", "T2DM Male"], "NEW-new-thin_clean_violinplot_TWC_male")
+plot_clean_thin_violin(["NGT Female", "T2DM Female"], "NEW-new-thin_clean_violinplot_TWC_female")

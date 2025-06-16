@@ -1,0 +1,49 @@
+import pandas as pd
+from scipy.stats import mannwhitneyu
+
+# Load Excel file
+file_path = "ngt-t2d-new.xlsx"  # Change this to your actual file path
+ngt = pd.read_excel(file_path, sheet_name="NGT")
+t2d = pd.read_excel(file_path, sheet_name="T2D")
+
+# Ensure both sheets have the same column names
+common_columns = list(set(ngt.columns).intersection(set(t2d.columns)))
+
+# Function to perform Mann-Whitney U test
+def mann_whitney_test(df1, df2, label1, label2, subgroup):
+    results = []
+    for col in df1.columns:
+        if col in df2.columns and pd.api.types.is_numeric_dtype(df1[col]):  # Only numeric columns
+            stat, p_value = mannwhitneyu(df1[col].dropna(), df2[col].dropna(), alternative="two-sided")
+            results.append({"Column": col, "P_Value": p_value})
+    
+    # Convert to DataFrame and save
+    results_df = pd.DataFrame(results)
+    results_df.to_csv(f"{label1}_vs_{label2}_{subgroup}_Mann_Whitney.csv", index=False)
+    return results_df
+
+# 1️⃣ Overall NGT vs T2D
+ngt_numeric = ngt[common_columns].drop(columns=["Sex"], errors="ignore")
+t2d_numeric = t2d[common_columns].drop(columns=["Sex"], errors="ignore")
+overall_results = mann_whitney_test(ngt_numeric, t2d_numeric, "NGT", "T2D", "Overall")
+
+# 2️⃣ Male NGT vs Male T2D
+ngt_male = ngt[ngt["Sex"] == "M"][common_columns].drop(columns=["Sex"], errors="ignore")
+t2d_male = t2d[t2d["Sex"] == "M"][common_columns].drop(columns=["Sex"], errors="ignore")
+male_results = mann_whitney_test(ngt_male, t2d_male, "NGT", "T2D", "Male")
+
+# 3️⃣ Female NGT vs Female T2D
+ngt_female = ngt[ngt["Sex"] == "F"][common_columns].drop(columns=["Sex"], errors="ignore")
+t2d_female = t2d[t2d["Sex"] == "F"][common_columns].drop(columns=["Sex"], errors="ignore")
+female_results = mann_whitney_test(ngt_female, t2d_female, "NGT", "T2D", "Female")
+
+# 4️⃣ Male vs Female (within NGT and T2D separately)
+ngt_m_vs_f = mann_whitney_test(ngt_male, ngt_female, "NGT_Male", "NGT_Female", "Sex_Comparison")
+t2d_m_vs_f = mann_whitney_test(t2d_male, t2d_female, "T2D_Male", "T2D_Female", "Sex_Comparison")
+
+# Print results
+print("Overall NGT vs T2D Results:\n", overall_results)
+print("\nMale NGT vs Male T2D Results:\n", male_results)
+print("\nFemale NGT vs Female T2D Results:\n", female_results)
+print("\nNGT Male vs Female Results:\n", ngt_m_vs_f)
+print("\nT2D Male vs Female Results:\n", t2d_m_vs_f)

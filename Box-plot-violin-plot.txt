@@ -1,0 +1,101 @@
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# Load Excel file
+file_path = "ngt-t2d.xlsx"  # Update file path if needed
+ngt = pd.read_excel(file_path, sheet_name="NGT")
+t2d = pd.read_excel(file_path, sheet_name="T2D")
+
+# Standardize column names
+ngt.columns = ngt.columns.str.strip().str.upper()
+t2d.columns = t2d.columns.str.strip().str.upper()
+
+# Ensure column names are unique
+ngt = ngt.loc[:, ~ngt.columns.duplicated()]
+t2d = t2d.loc[:, ~t2d.columns.duplicated()]
+
+# Add 'GROUP' column for overall comparison
+ngt["GROUP"] = "NGT Overall"
+t2d["GROUP"] = "T2D Overall"
+
+# Add sex-specific groups
+ngt_male = ngt[ngt["SEX"] == "M"].copy()
+t2d_male = t2d[t2d["SEX"] == "M"].copy()
+ngt_female = ngt[ngt["SEX"] == "F"].copy()
+t2d_female = t2d[t2d["SEX"] == "F"].copy()
+
+ngt_male["GROUP"] = "NGT Male"
+t2d_male["GROUP"] = "T2D Male"
+ngt_female["GROUP"] = "NGT Female"
+t2d_female["GROUP"] = "T2D Female"
+
+# Merge datasets into one
+df = pd.concat([ngt, t2d, ngt_male, t2d_male, ngt_female, t2d_female], ignore_index=True)
+
+# Define parameters for plots
+parameters = ["AGE", "HEIGHT", "WEIGHT", "BMI", "TWC", "NEU", "LYM", "NEUT-LYMP RATIO",
+              "MON", "EOS", "BAS", "INSULIN", "CRP", "C-PEPTIDE", "FBS", "HBA1C"]
+
+# Check for missing columns
+existing_params = [col for col in parameters if col in df.columns]
+missing_params = set(parameters) - set(existing_params)
+if missing_params:
+    print("⚠️ Warning: The following columns were not found and will be skipped:", missing_params)
+
+# Convert numeric columns
+df[existing_params] = df[existing_params].apply(pd.to_numeric, errors="coerce")
+
+# Define group order
+group_order = ["NGT Overall", "T2D Overall", "NGT Male", "T2D Male", "NGT Female", "T2D Female"]
+
+# Define a bright color palette for groups
+group_palette = {
+    "NGT Overall": "#7fc97f",   # Bright Red-Orange
+    "T2D Overall": "#beaed4",   # Bright Green
+    "NGT Male": "#fdc086",      # Bright Blue
+    "T2D Male": "#ffff99",      # Bright Yellow
+    "NGT Female": "#386cb0",    # Bright Purple
+    "T2D Female": "#f0027f"     # Bright Pink
+}
+
+
+# Function to create box plots with unique colors and legend
+def plot_boxplots():
+    for param in existing_params:
+        plt.figure(figsize=(10, 6))
+        ax = sns.boxplot(x="GROUP", y=param, data=df, order=group_order, 
+                         palette=group_palette, showfliers=True, showmeans=False)
+        plt.xticks(rotation=45)
+        plt.title(f"Box Plot of {param} Across Groups")
+        plt.ylabel(param)
+        plt.xlabel("Group")
+        ax.legend(handles=[plt.Line2D([0], [0], marker="s", color="w", markerfacecolor=color, markersize=10, label=group) 
+                           for group, color in group_palette.items()], title="Groups")
+        plt.tight_layout()
+        plt.savefig(f"boxplot_{param}.png", dpi=300)
+        plt.show()
+
+# Function to create violin plots with unique colors and legend
+def plot_violinplots():
+    for param in existing_params:
+        plt.figure(figsize=(10, 6))
+        ax = sns.violinplot(x="GROUP", y=param, data=df, order=group_order, 
+                            palette=group_palette, inner="quartile", linewidth=1.2)
+        plt.xticks(rotation=45)
+        plt.title(f"Violin Plot of {param} Across Groups")
+        plt.ylabel(param)
+        plt.xlabel("Group")
+        ax.legend(handles=[plt.Line2D([0], [0], marker="s", color="w", markerfacecolor=color, markersize=10, label=group) 
+                           for group, color in group_palette.items()], title="Groups")
+        plt.tight_layout()
+        plt.savefig(f"violinplot_{param}.png", dpi=300)
+        plt.show()
+
+
+# Generate plots
+print("📊 Generating boxplots...")
+plot_boxplots()
+
+print("🎻 Generating violin plots...")
+plot_violinplots()
